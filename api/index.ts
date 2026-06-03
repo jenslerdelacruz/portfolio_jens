@@ -1,7 +1,5 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-
 // This handler bridges TanStack Start server to Vercel Functions
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   try {
     // Import the actual server - TanStack Start exports a fetch handler
     const serverModule = await import("../dist/server/index.mjs");
@@ -21,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: req.method,
       headers: new Headers(
         Object.fromEntries(
-          Object.entries(req.headers).map(([k, v]) => [
+          Object.entries(req.headers).map(([k, v]: [string, any]) => [
             k,
             Array.isArray(v) ? v[0] : (v || ""),
           ])
@@ -37,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Copy response status and headers
     res.status(response.status);
-    response.headers.forEach((value, key) => {
+    response.headers.forEach((value: string, key: string) => {
       res.setHeader(key, value);
     });
 
