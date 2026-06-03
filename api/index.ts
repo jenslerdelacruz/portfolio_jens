@@ -1,13 +1,36 @@
 // This handler bridges TanStack Start server to Vercel Functions
 export default async function handler(req: any, res: any) {
   try {
-    // Import the actual server - TanStack Start exports a fetch handler
-    const serverModule = await import("../dist/server/index.mjs");
-    const server = serverModule.default;
+    // Try different possible import paths for the built server
+    let server: any;
+    const possiblePaths = [
+      "../dist/server/index.mjs",
+      "../dist/server.mjs",
+      "../dist/index.mjs",
+      "../.output/server/index.mjs",
+    ];
+
+    for (const path of possiblePaths) {
+      try {
+        const module = await import(path);
+        server = module.default || module;
+        if (server && typeof server.fetch === "function") {
+          console.log(`[Server] Loaded from: ${path}`);
+          break;
+        }
+      } catch (e) {
+        console.log(`[Server] Path ${path} not found, trying next...`);
+      }
+    }
 
     if (!server || typeof server.fetch !== "function") {
-      console.error("Server module does not export a fetch handler");
-      return res.status(500).json({ error: "Server initialization failed" });
+      console.error("[Server] No valid server module found with fetch handler");
+      return res
+        .status(500)
+        .json({
+          error: "Internal Server Error",
+          message: "Server module not found or invalid",
+        });
     }
 
     // Build a Web Request from Vercel's request
@@ -21,7 +44,7 @@ export default async function handler(req: any, res: any) {
         Object.fromEntries(
           Object.entries(req.headers).map(([k, v]: [string, any]) => [
             k,
-            Array.isArray(v) ? v[0] : (v || ""),
+            Array.isArray(v) ? v[0] : v || "",
           ])
         )
       ),
@@ -46,7 +69,7 @@ export default async function handler(req: any, res: any) {
     console.error("[Vercel API Error]", error);
     res.status(500).json({
       error: "Internal Server Error",
-      details: process.env.NODE_ENV === "development" ? String(error) : undefined,
+      message: String(error),
     });
   }
 }
