@@ -1,57 +1,70 @@
 // This handler bridges TanStack Start server to Vercel Functions
+import { createServer } from "http";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 export default async function handler(req: any, res: any) {
   try {
-    // Import the TanStack Start server entry
-    const serverEntry = await import("@tanstack/react-start/server-entry");
-    const server = serverEntry.default || serverEntry;
-
-    if (!server || typeof server.fetch !== "function") {
-      console.error("[Server] No valid server module found with fetch handler");
-      return res
-        .status(500)
-        .json({
+    // Try to load the built server module
+    let server: any;
+    
+    try {
+      // Try the standard TanStack Start build output path
+      const serverPath = join(__dirname, "../dist/server/index.mjs");
+      server = await import(serverPath);
+      server = server.default || server;
+    } catch (e1) {
+      try {
+        // Fallback to package entry
+        const entry = await import("@tanstack/react-start/server");
+        server = entry.default || entry;
+      } catch (e2) {
+        console.error("[API] Failed to load server", { e1: String(e1), e2: String(e2) });
+        return res.status(500).json({
           error: "Internal Server Error",
-          message: "Server module not found or invalid",
+          message: "Server module not found",
         });
+      }
     }
 
-    // Build a Web Request from Vercel's request
-    const url = `${req.headers["x-forwarded-proto"] || "http"}://${
-      req.headers["x-forwarded-host"] || req.headers.host
-    }${req.url}`;
+    if (!server || typeof server.fetch !== "function") {
+      return res.status(500).json({
+        error: "Internal Server Error",
+        message: "Server has no fetch method",
+      });
+    }
 
-    const request = new Request(url, {
+    // Build request URL
+    const protocol = req.headers["x-forwarded-proto"] || "http";
+    const host = req.headers["x-forwarded-host"] || req.headers.host;
+    const url = `${protocol}://${host}${req.url}`;
+
+    // Create Web Request
+    const webRequest = new Request(url, {
       method: req.method,
-      headers: new Headers(
-        Object.fromEntries(
-          Object.entries(req.headers).map(([k, v]: [string, any]) => [
-            k,
-            Array.isArray(v) ? v[0] : v || "",
-          ])
-        )
-      ),
-      body: ["GET", "HEAD", "OPTIONS"].includes(req.method || "GET")
-        ? null
-        : JSON.stringify(req.body),
+      headers: req.headers,
+      body: ["GET", "HEAD", "OPTIONS"].includes(req.method) ? null : JSON.stringify(req.body),
     });
 
-    // Call the TanStack Start server
-    const response = await server.fetch(request, {}, {});
+    // Get response from server
+    const response = await server.fetch(webRequest);
 
-    // Copy response status and headers
+    // Send response back
     res.status(response.status);
     response.headers.forEach((value: string, key: string) => {
       res.setHeader(key, value);
     });
 
-    // Send response body
     const body = await response.text();
     res.send(body);
-  } catch (error) {
-    console.error("[Vercel API Error]", error);
+  } catch (error: any) {
+    console.error("[API Error]", error);
     res.status(500).json({
       error: "Internal Server Error",
-      message: String(error),
+      message: error?.message || String(error),
     });
   }
 }
