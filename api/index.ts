@@ -1,36 +1,19 @@
 // This handler bridges TanStack Start server to Vercel Functions
 export default async function handler(req: any, res: any) {
   try {
-    // For static assets, let Vercel serve them directly
+    // Filter out static assets
     if (req.url.match(/\.(js|css|png|jpg|gif|svg|ico|json|woff|woff2|ttf|eot)(\?.*)?$/)) {
       return res.status(404).json({ error: "Not found" });
     }
 
-    // Try to load the built server
-    let serverModule: any;
-
-    try {
-      // Import the built server from dist
-      const { default: server } = await import("../dist/server/index.mjs");
-      serverModule = server;
-    } catch (e) {
-      console.error("[API] Failed to load server from dist:", e);
-      
-      // Try fallback import
-      try {
-        const entry = await import("@tanstack/react-start/server");
-        serverModule = entry.default || entry;
-      } catch (e2) {
-        console.error("[API] Fallback import also failed:", e2);
-        throw new Error("Could not load server module");
-      }
+    // Load the TanStack Start server
+    const { startInstance } = await import("../src/start");
+    
+    if (!startInstance || typeof startInstance.fetch !== "function") {
+      throw new Error("Server instance has no fetch method");
     }
 
-    if (!serverModule || typeof serverModule.fetch !== "function") {
-      throw new Error("Server module has no fetch method");
-    }
-
-    // Build the URL
+    // Build the request URL
     const url = `${req.headers["x-forwarded-proto"] || "http"}://${
       req.headers["x-forwarded-host"] || req.headers.host
     }${req.url}`;
@@ -42,8 +25,8 @@ export default async function handler(req: any, res: any) {
       body: ["GET", "HEAD", "OPTIONS"].includes(req.method) ? null : req.body,
     });
 
-    // Call server
-    const response = await serverModule.fetch(webRequest);
+    // Call the server
+    const response = await startInstance.fetch(webRequest);
 
     // Return response
     res.status(response.status);
@@ -58,12 +41,11 @@ export default async function handler(req: any, res: any) {
       message: error?.message,
       stack: error?.stack,
       url: req.url,
-      method: req.method,
     });
 
     res.status(500).json({
       error: "Internal Server Error",
-      details: process.env.NODE_ENV === "development" ? error?.message : undefined,
+      message: error?.message || "Unknown error",
     });
   }
 }
