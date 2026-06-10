@@ -6,11 +6,13 @@ export default async function handler(req: any, res: any) {
       return res.status(404).json({ error: "Not found" });
     }
 
-    // Load the TanStack Start server
-    const { startInstance } = await import("../src/start");
+    // Load the built TanStack Start server
+    // The server is built to dist/server/server.js by Vite
+    const serverModule = await import("../dist/server/server.js");
+    const server = serverModule.default || serverModule;
     
-    if (!startInstance || typeof startInstance.fetch !== "function") {
-      throw new Error("Server instance has no fetch method");
+    if (!server || typeof server.fetch !== "function") {
+      throw new Error("Server module has no fetch method");
     }
 
     // Build the request URL
@@ -26,7 +28,7 @@ export default async function handler(req: any, res: any) {
     });
 
     // Call the server
-    const response = await startInstance.fetch(webRequest);
+    const response = await server.fetch(webRequest);
 
     // Return response
     res.status(response.status);
