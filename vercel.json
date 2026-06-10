@@ -2,6 +2,7 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": null,
+  "outputDirectory": "dist/client",
   "env": {
     "NODE_ENV": "production"
   },
@@ -14,5 +15,10 @@
       "source": "/(.*)",
       "destination": "/api"
     }
-  ]
+  ],
+  "functions": {
+    "api/**": {
+      "runtime": "nodejs20.x"
+    }
+  }
 }

@@ -1,27 +1,9 @@
 // This handler bridges TanStack Start server to Vercel Functions
 export default async function handler(req: any, res: any) {
   try {
-    // Try different possible import paths for the built server
-    let server: any;
-    const possiblePaths = [
-      "../dist/server/index.mjs",
-      "../dist/server.mjs",
-      "../dist/index.mjs",
-      "../.output/server/index.mjs",
-    ];
-
-    for (const path of possiblePaths) {
-      try {
-        const module = await import(path);
-        server = module.default || module;
-        if (server && typeof server.fetch === "function") {
-          console.log(`[Server] Loaded from: ${path}`);
-          break;
-        }
-      } catch (e) {
-        console.log(`[Server] Path ${path} not found, trying next...`);
-      }
-    }
+    // Import the TanStack Start server entry
+    const serverEntry = await import("@tanstack/react-start/server-entry");
+    const server = serverEntry.default || serverEntry;
 
     if (!server || typeof server.fetch !== "function") {
       console.error("[Server] No valid server module found with fetch handler");
