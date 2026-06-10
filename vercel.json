@@ -12,6 +12,10 @@
       "destination": "/dist/client/assets/:path*"
     },
     {
+      "source": "/favicon.ico",
+      "destination": "/public/favicon.ico"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api"
     }
